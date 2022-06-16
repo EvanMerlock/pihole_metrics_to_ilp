@@ -3,8 +3,8 @@
 ####################################################################################################
 FROM rust:latest AS builder
 
-RUN rustup target add x86_64-unknown-linux-musl
-RUN apt update && apt install -y musl-tools musl-dev
+RUN rustup target add x86_64-unknown-linux-gnu
+RUN apt update
 RUN update-ca-certificates
 
 # Create appuser
@@ -25,12 +25,12 @@ WORKDIR /pimetrics
 
 COPY ./ .
 
-RUN cargo build --target x86_64-unknown-linux-musl --release
+RUN cargo build --target x86_64-unknown-linux-gnu --release
 
 ####################################################################################################
 ## Final image
 ####################################################################################################
-FROM alpine
+FROM archlinux:base-devel
 
 # Import from builder.
 COPY --from=builder /etc/passwd /etc/passwd
@@ -39,7 +39,10 @@ COPY --from=builder /etc/group /etc/group
 WORKDIR /pimetrics
 
 # Copy our build
-COPY --from=builder /pimetrics/target/x86_64-unknown-linux-musl/release/pimetrics ./
+COPY --from=builder /pimetrics/target/x86_64-unknown-linux-gnu/release pimetrics ./
+
+
+RUN pacman -Syu --noconfirm
 
 # Use an unprivileged user.
 USER pimetrics:pimetrics

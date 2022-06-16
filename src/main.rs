@@ -5,12 +5,12 @@ use std::{fs::File, io::{Read, Write}};
 use rocket::http::{Status, ContentType};
 use rusqlite::Connection;
 
-const SQLLITE_DB_LOCATION: &'static str = "./pihole-FTL.db";
-const TIME_CHECK_NAME: &'static str = "./last_time_check";
+const SQLLITE_DB_LOCATION: &'static str = "/pihole-FTL.db";
+const TIME_CHECK_NAME: &'static str = "/last_file_check";
 const LINE_DELIMITER: &'static str = "\n";
 const SQL_QUERY: &'static str = 
     "SELECT 
-        timestamp||substr(id,length(id)-2,3),
+        timestamp,
         type,
         status,
         domain,
@@ -20,7 +20,10 @@ const SQL_QUERY: &'static str =
     FROM 
         queries 
     WHERE 
-        id > ?1";
+        id > ?1
+    ORDER BY
+        id
+    LIMIT 5000";
 
 #[derive(Debug)]
 pub struct PiholeEntry {
@@ -51,7 +54,7 @@ fn get_pihole_stats() -> (Status, (ContentType, String)) {
             Ok(_) => {},
             Err(e) => return (Status::InternalServerError, (ContentType::Text, e.to_string())),
         };
-        last_id = match id_buf.parse() {
+        last_id = match id_buf.trim().parse() {
             Ok(item) => item,
             Err(e) => return (Status::InternalServerError, (ContentType::Text, e.to_string())),
         };
@@ -107,17 +110,22 @@ fn get_pihole_stats() -> (Status, (ContentType, String)) {
 
 fn process_individual_value(row: &rusqlite::Row) -> Result<PiholeEntry, rusqlite::Error> {
 
+    let id = row.get(6)?;
 
-    let pre_time: String = row.get(0)?;
+    let pre_time: u64 = row.get(0)?;
+    let hundreds_place = (id / 100) % 10;
+    let tens_place = (id / 10) % 10;
+    let ones_place = id % 10;
+    let real_time: String = format!("{}{}{}{}000000", pre_time, hundreds_place, tens_place, ones_place);
 
     Ok(PiholeEntry {
-        time: pre_time.parse().expect("oops shit broke"),
+        time: real_time.parse().expect("oops shit broke"),
         query_type: row.get(1)?,
         status: row.get(2)?,
         domain: row.get(3)?,
         client: row.get(4)?,
         upstream: row.get(5)?,
-        id: row.get(6)?
+        id: id,
     })
 
 }
