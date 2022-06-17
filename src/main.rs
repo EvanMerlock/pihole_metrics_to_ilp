@@ -6,8 +6,8 @@ use rocket::{http::{Status, ContentType}, State};
 use rusqlite::Connection;
 use serde::Deserialize;
 
-const SQLLITE_DB_LOCATION: &'static str = "/pihole-FTL.db";
-const LOCK_FILE: &'static str = "/last_file_check";
+const SQLLITE_DB_LOCATION: &'static str = "./pihole-FTL.db";
+const LOCK_FILE: &'static str = "./last_file_check";
 const LINE_DELIMITER: &'static str = "\n";
 const SQL_QUERY: &'static str = 
     "SELECT 
@@ -17,7 +17,8 @@ const SQL_QUERY: &'static str =
         domain,
         client,
         IFNULL(forward, \'null\') forward,
-        id 
+        reply_type,
+        id
     FROM 
         queries 
     WHERE 
@@ -35,8 +36,8 @@ pub struct PiholeEntry {
     domain: String,
     client: String,
     status: u64,
-    upstream: String
-
+    upstream: String,
+    reply_type: u64,
 }
 
 #[derive(Deserialize, Debug)]
@@ -161,11 +162,11 @@ fn format_error(hdr: &'static str, msg: String) -> String {
 
 fn process_individual_value(row: &rusqlite::Row) -> Result<PiholeEntry, rusqlite::Error> {
 
-    let id = row.get(6)?;
+    let id = row.get(7)?;
 
     let pre_time: u64 = row.get(0)?;
     let (hundreds, tens, ones) = extract_places(id);
-    let real_time: String = format!("{}{}{}{}000000", pre_time, hundreds, tens, ones);
+    let real_time: String = format!("{}{}{}{}", pre_time, hundreds, tens, ones);
 
     Ok(PiholeEntry {
         time: real_time.parse().expect("oops shit broke"),
@@ -174,6 +175,7 @@ fn process_individual_value(row: &rusqlite::Row) -> Result<PiholeEntry, rusqlite
         domain: row.get(3)?,
         client: row.get(4)?,
         upstream: row.get(5)?,
+        reply_type: row.get(6)?,
         id,
     })
 
@@ -188,14 +190,15 @@ fn extract_places(id: u64) -> (u64, u64, u64) {
 
 fn pihole_entry_to_ilp(pihole_entry: PiholeEntry) -> (String, u64) {
 
-    (format!("dnsquery,query_type=\"{}\",client=\"{}\",status=\"{}\",domain=\"{}\",upstream=\"{}\" id={} {}", 
-        pihole_entry.query_type, 
-        pihole_entry.client, 
-        pihole_entry.status, 
-        pihole_entry.domain, 
-        pihole_entry.upstream, 
+    (format!("{},{},{},{},{},{},{},{}", 
         pihole_entry.id,
-        pihole_entry.time
+        pihole_entry.time,
+        pihole_entry.query_type,
+        pihole_entry.status,
+        pihole_entry.reply_type,
+        pihole_entry.client, 
+        pihole_entry.domain,
+        pihole_entry.upstream,
     ), pihole_entry.id)
 
 }
