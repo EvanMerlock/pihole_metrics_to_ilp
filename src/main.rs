@@ -6,8 +6,8 @@ use rocket::{http::{Status, ContentType}, State};
 use rusqlite::Connection;
 use serde::Deserialize;
 
-const SQLLITE_DB_LOCATION: &'static str = "./pihole-FTL.db";
-const LOCK_FILE: &'static str = "./last_file_check";
+const SQLLITE_DB_LOCATION: &'static str = "/pihole-FTL.db";
+const LOCK_FILE: &'static str = "/last_file_check";
 const LINE_DELIMITER: &'static str = "\n";
 const SQL_QUERY: &'static str = 
     "SELECT 
